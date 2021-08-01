@@ -86,7 +86,7 @@ class BookController {
 
 	@GetMapping
 	public Flux<Book> getBooksByCreatedUser() {
-		return bookRepository.findBooksByUser();
+		return bookRepository.findBooksForCurrentUser();
 	}
 
 	@PostMapping
@@ -109,7 +109,7 @@ class DataConfig {
 
 interface BookRepository extends ReactiveCrudRepository<Book,Long> {
 	@Query("select * from Book b where b.user = ?#{authentication?.name}")
-	Flux<Book> findBooksByUser();
+	Flux<Book> findBooksForCurrentUser();
 }
 
 @Data @AllArgsConstructor @NoArgsConstructor
