@@ -1,8 +1,5 @@
 package com.thomasvitale.springsecuritydatareactiveexample;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -16,6 +13,8 @@ import org.springframework.data.domain.ReactiveAuditorAware;
 import org.springframework.data.r2dbc.config.EnableR2dbcAuditing;
 import org.springframework.data.r2dbc.repository.Query;
 import org.springframework.data.repository.reactive.ReactiveCrudRepository;
+import org.springframework.data.spel.spi.EvaluationContextExtension;
+import org.springframework.data.spel.spi.ReactiveEvaluationContextExtension;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.core.Authentication;
@@ -26,6 +25,7 @@ import org.springframework.security.core.userdetails.ReactiveUserDetailsService;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.crypto.password.NoOpPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.data.repository.query.SecurityEvaluationContextExtension;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -41,8 +41,21 @@ public class SpringSecurityDataReactiveExampleApplication {
 	}
 
 	@Bean
-	public ReactiveSecurityEvaluationContextExtension reactiveSecurityEvaluationContextExtension() {
-		return new ReactiveSecurityEvaluationContextExtension();
+	ReactiveEvaluationContextExtension securityExtension(){
+		return new ReactiveEvaluationContextExtension() {
+
+			@Override
+			public String getExtensionId() {
+				return "security";
+			}
+
+			@Override
+			public Mono<? extends EvaluationContextExtension> getExtension() {
+				return ReactiveSecurityContextHolder.getContext()
+						.map(SecurityContext::getAuthentication)
+						.map(SecurityEvaluationContextExtension::new);
+			}
+		};
 	}
 
 	@Bean
@@ -89,6 +102,11 @@ class BookController {
 		return bookRepository.findBooksForCurrentUser();
 	}
 
+	@GetMapping("/test")
+	public Flux<Book> getBooksByCreatedUserTest() {
+		return bookRepository.findBooksForUser(null);
+	}
+
 	@PostMapping
 	public Mono<Book> addBook(@RequestBody Book book) {
 		return bookRepository.save(book);
@@ -108,15 +126,17 @@ class DataConfig {
 }
 
 interface BookRepository extends ReactiveCrudRepository<Book,Long> {
-	@Query("select * from Book b where b.user = ?#{authentication?.name}")
+	@Query("select * from Book b where b.user = ?#{authentication.name}")
 	Flux<Book> findBooksForCurrentUser();
+
+	@Query("{ 'user': ?#{authentication.name} }")
+	Flux<Book> findBooksForUser(String user);
 }
 
-@Data @AllArgsConstructor @NoArgsConstructor
-class Book {
+record Book (
 	@Id
-	private Long id;
-	private String name;
+	Long id,
+	String name,
 	@CreatedBy
-	private String user;
-}
+	String user
+){}
