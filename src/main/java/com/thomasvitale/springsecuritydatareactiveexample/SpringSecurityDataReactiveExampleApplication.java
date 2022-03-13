@@ -55,6 +55,13 @@ public class SpringSecurityDataReactiveExampleApplication {
 						.map(SecurityContext::getAuthentication)
 						.map(SecurityEvaluationContextExtension::new);
 			}
+
+//			@Override
+//			public Mono<? extends EvaluationContextExtension> getExtension() {
+//				return Mono.defer(() -> ReactiveSecurityContextHolder.getContext()
+//						.map(SecurityContext::getAuthentication)
+//						.map(SecurityEvaluationContextExtension::new));
+//			}
 		};
 	}
 
